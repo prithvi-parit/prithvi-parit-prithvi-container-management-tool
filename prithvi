@@ -1,0 +1,90 @@
+#!/bin/bash
+
+helpFunction()
+{
+   echo ""
+   #echo "Usage: $0 -o parameter -d parameterB -i parameterC"
+   echo -e "\t-o Enter the opertaion to be performed like run/ps/delete"
+   echo -e "\t-t types yes if you need terminal type no if you want to launch in background"
+   echo -e "\t-n enter name of Container "
+   echo -e "\t-i Type image if required"
+   #echo -e "\t-h help"
+   exit 1 # Exit script after printing help
+}
+
+while getopts "o:t:n:i:h:" opt
+do
+   case "$opt" in
+      o ) parameterA="$OPTARG" ;;
+      t ) parameterB="$OPTARG" ;;
+      n ) parameterC="$OPTARG" ;;
+      i ) parameterD="$OPTARG" ;;
+      ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
+   esac
+done
+
+# Print helpFunction in case parameters are empty
+if [ -z "$parameterA" ] #|| [ -z "$parameterB" ] || [ -z "$parameterC" ]
+then
+   echo "Some  of the parameters are empty";
+   helpFunction
+fi
+
+# Begin script in case all parameters are correct
+#echo "$parameterA"
+#echo "$parameterB"
+#echo "$parameterC"
+#echo "$parameterD"
+if  test "$parameterA" == "run"
+then
+        echo "running container";
+        if [ -z "$parameterA" ] || [ -z "$parameterB" ] || [ -z "$parameterC" ]  || [ -z "$parameterD" ]
+        then
+            echo "Some  of the parameters are empty";
+            helpFunction
+        else
+                echo "downloading image";
+                mkdir /myws/$parameterC
+                if test "$?" != 0
+                then
+                        echo "container already exist"
+                        exit
+                else
+                        cd /myws/$parameterC
+                        skopeo copy docker://docker.io/library/$parameterD  oci:$parameterD:v1
+                        umoci unpack --image $parameterD:v1  /myws/$parameterC
+                        if test "$parameterB" == "no"
+                        then
+                                mv config.json config2.json
+                                jq '.process.terminal=false | .hostname="prithvi"' config2.json > config.json
+                                rm config2.json
+                                runc create $parameterC
+                                runc 'start' $parameterC
+                                echo "container launched"
+                        else
+                                mv config.json config2.json
+                                jq '.hostname="prithvi"' config2.json > config.json
+                                rm config2.json
+                                runc --root $HOME/.runc run $parameterC
+                                echo "container launched"
+                        fi
+                fi
+        fi
+elif test "$parameterA" == "ps"
+then
+        #echo "listing container";
+        runc list
+elif test "$parameterA" == "delete"
+then
+        echo "deleting container $parameterC";
+        if [ -z "$parameterA" ] ||  [ -z "$parameterC" ]
+        then
+            echo "Some  of the parameters are empty";
+            helpFunction
+        else
+                runc delete -f  "$parameterC"
+                rm -rf /myws/$parameterC
+        fi
+else
+        helpFunction
+fi
